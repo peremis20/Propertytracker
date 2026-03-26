@@ -1,0 +1,149 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Property": {
+      "title": "Property",
+      "description": "Property details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "type": { "type": "string", "enum": ["single", "duplex", "mobile_home", "apartment_complex"] },
+        "units": { "type": "number" },
+        "bedrooms": { "type": "number" },
+        "bathrooms": { "type": "number" },
+        "sqft": { "type": "number" },
+        "purchasePrice": { "type": "number" },
+        "purchaseDate": { "type": "string", "format": "date" },
+        "monthlyRent": { "type": "number" },
+        "securityDeposit": { "type": "number" },
+        "status": { "type": "string", "enum": ["vacant", "occupied"] },
+        "ownerName": { "type": "string" },
+        "annualTax": { "type": "number" },
+        "annualInsurance": { "type": "number" },
+        "tenantName": { "type": "string" },
+        "tenantEmail": { "type": "string" },
+        "tenantPhone": { "type": "string" },
+        "leaseStart": { "type": "string", "format": "date" },
+        "leaseEnd": { "type": "string", "format": "date" },
+        "photos": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "string" },
+        "mortgagePrincipal": { "type": "number" },
+        "mortgageInterestRate": { "type": "number" },
+        "mortgageTermYears": { "type": "number" },
+        "mortgageStartDate": { "type": "string", "format": "date" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerId", "name", "address", "type", "status"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Expense record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "propertyId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "amount": { "type": "number" },
+        "category": { "type": "string", "enum": ["repairs", "utilities", "taxes", "insurance", "management", "other"] },
+        "description": { "type": "string" },
+        "frequency": { "type": "string", "enum": ["one-time", "weekly", "bi-weekly", "monthly", "yearly"] },
+        "receiptUrl": { "type": "string" }
+      },
+      "required": ["id", "propertyId", "ownerId", "date", "amount", "category", "frequency"]
+    },
+    "Income": {
+      "title": "Income",
+      "description": "Income record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "propertyId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "amount": { "type": "number" },
+        "source": { "type": "string", "enum": ["rent", "parking", "laundry", "other"] },
+        "status": { "type": "string", "enum": ["paid", "late", "missed"] },
+        "frequency": { "type": "string", "enum": ["one-time", "weekly", "bi-weekly", "monthly", "yearly"] },
+        "tenantId": { "type": "string" }
+      },
+      "required": ["id", "propertyId", "ownerId", "date", "amount", "source", "status", "frequency"]
+    },
+    "Maintenance": {
+      "title": "Maintenance",
+      "description": "Maintenance log entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "propertyId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string", "enum": ["repair", "improvement", "inspection", "emergency"] },
+        "status": { "type": "string", "enum": ["pending", "in-progress", "completed"] },
+        "cost": { "type": "number" },
+        "vendor": { "type": "string" },
+        "photos": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["id", "propertyId", "ownerId", "date", "title", "description", "category", "status"]
+    },
+    "Tenant": {
+      "title": "Tenant",
+      "description": "Tenant information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "propertyId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "leaseStart": { "type": "string", "format": "date" },
+        "leaseEnd": { "type": "string", "format": "date" },
+        "monthlyRent": { "type": "number" },
+        "rentDueDate": { "type": "number" }
+      },
+      "required": ["id", "propertyId", "ownerId", "name"]
+    },
+    "Document": {
+      "title": "Document",
+      "description": "Document metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "propertyId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["tax", "insurance", "warranty", "lease", "other"] },
+        "url": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "propertyId", "ownerId", "name", "type", "url"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": { "schema": "User", "description": "User profiles" },
+    "/properties/{propertyId}": { "schema": "Property", "description": "Properties" },
+    "/expenses/{expenseId}": { "schema": "Expense", "description": "Expenses" },
+    "/income/{incomeId}": { "schema": "Income", "description": "Income" },
+    "/maintenance/{maintenanceId}": { "schema": "Maintenance", "description": "Maintenance logs" },
+    "/tenants/{tenantId}": { "schema": "Tenant", "description": "Tenants" },
+    "/documents/{documentId}": { "schema": "Document", "description": "Documents" }
+  }
+}

@@ -1,0 +1,199 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    allow read, write: if false;
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    // Collection: users
+    // Fields: uid, email, displayName, photoURL, createdAt
+    //
+    // Collection: properties
+    // Fields: id, ownerId, name, address, type, units, bedrooms, bathrooms, sqft, purchasePrice, purchaseDate, monthlyRent, securityDeposit, status, ownerName, annualTax, annualInsurance, photos, notes, mortgagePrincipal, mortgageInterestRate, mortgageTermYears, mortgageStartDate, createdAt
+    //
+    // Collection: expenses
+    // Fields: id, propertyId, ownerId, date, amount, category, description, frequency, receiptUrl
+    //
+    // Collection: income
+    // Fields: id, propertyId, ownerId, date, amount, source, status, frequency, tenantId
+    //
+    // Collection: maintenance
+    // Fields: id, propertyId, ownerId, date, title, description, category, status, cost, vendor, photos
+    //
+    // Collection: tenants
+    // Fields: id, propertyId, ownerId, name, email, phone, leaseStart, leaseEnd, monthlyRent, rentDueDate
+    //
+    // Collection: documents
+    // Fields: id, propertyId, ownerId, name, type, url, createdAt
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.ownerId;
+    }
+
+    function isNewDocOwner() {
+      return isAuthenticated() && request.auth.uid == request.resource.data.ownerId;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.email == "peremishealth@gmail.com" || request.auth.token.email == "jimmy@peremis.com") && 
+        request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (isSuperAdmin() || 
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // ===============================================================
+    // Validators
+    // ===============================================================
+    function isValidUser(data, uid) {
+      return data.uid == uid &&
+             isValidEmail(data.email) &&
+             (data.displayName == null || (data.displayName is string && data.displayName.size() < 100)) &&
+             data.role in ['admin', 'manager', 'viewer'];
+    }
+
+    function isValidProperty(data) {
+      return data.ownerId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.address is string && data.address.size() > 0 && data.address.size() < 200 &&
+             data.type in ['single', 'duplex', 'mobile_home', 'apartment_complex'] &&
+             data.status in ['vacant', 'occupied'] &&
+             data.notes is string && data.notes.size() < 2000;
+    }
+
+    function isValidExpense(data) {
+      return data.ownerId == request.auth.uid &&
+             data.amount is number && data.amount >= 0 &&
+             data.category in ['repairs', 'utilities', 'taxes', 'insurance', 'management', 'other'] &&
+             data.frequency in ['one-time', 'weekly', 'bi-weekly', 'monthly', 'yearly'] &&
+             data.description is string && data.description.size() < 500;
+    }
+
+    function isValidIncome(data) {
+      return data.ownerId == request.auth.uid &&
+             data.amount is number && data.amount >= 0 &&
+             data.source in ['rent', 'parking', 'laundry', 'other'] &&
+             data.status in ['paid', 'late', 'missed'] &&
+             data.frequency in ['one-time', 'weekly', 'bi-weekly', 'monthly', 'yearly'];
+    }
+
+    function isValidMaintenance(data) {
+      return data.ownerId == request.auth.uid &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
+             data.description is string && data.description.size() > 0 && data.description.size() < 1000 &&
+             data.category in ['repair', 'improvement', 'inspection', 'emergency'] &&
+             data.status in ['pending', 'in-progress', 'completed'];
+    }
+
+    function isValidTenant(data) {
+      return data.ownerId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             (data.email == null || isValidEmail(data.email));
+    }
+
+    function isValidDocument(data) {
+      return data.ownerId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.type in ['tax', 'insurance', 'warranty', 'lease', 'other'] &&
+             isValidUrl(data.url);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) && isValidUser(request.resource.data, uid) && 
+                    (request.resource.data.role == 'viewer' || 
+                     isSuperAdmin() || 
+                     (exists(/databases/$(database)/documents/invites/$(request.resource.data.email.lower())) && 
+                      get(/databases/$(database)/documents/invites/$(request.resource.data.email.lower())).data.role == request.resource.data.role));
+      allow update: if (isOwner(uid) && isValidUser(request.resource.data, uid) && areImmutableFieldsUnchanged(['uid', 'createdAt', 'role'])) ||
+                    (isAdmin() && isValidUser(request.resource.data, uid) && areImmutableFieldsUnchanged(['uid', 'createdAt', 'email']));
+    }
+
+    match /properties/{propertyId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isNewDocOwner() && isValidProperty(request.resource.data);
+      allow update: if isDocOwner() && isValidProperty(request.resource.data) && areImmutableFieldsUnchanged(['ownerId', 'id', 'createdAt']);
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /expenses/{expenseId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isNewDocOwner() && isValidExpense(request.resource.data);
+      allow update: if isDocOwner() && isValidExpense(request.resource.data) && areImmutableFieldsUnchanged(['ownerId', 'id']);
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /income/{incomeId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isNewDocOwner() && isValidIncome(request.resource.data);
+      allow update: if isDocOwner() && isValidIncome(request.resource.data) && areImmutableFieldsUnchanged(['ownerId', 'id']);
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /maintenance/{maintenanceId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isNewDocOwner() && isValidMaintenance(request.resource.data);
+      allow update: if isDocOwner() && isValidMaintenance(request.resource.data) && areImmutableFieldsUnchanged(['ownerId', 'id']);
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /tenants/{tenantId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isNewDocOwner() && isValidTenant(request.resource.data);
+      allow update: if isDocOwner() && isValidTenant(request.resource.data) && areImmutableFieldsUnchanged(['ownerId', 'id']);
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /documents/{documentId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isNewDocOwner() && isValidDocument(request.resource.data);
+      allow update: if isDocOwner() && isValidDocument(request.resource.data) && areImmutableFieldsUnchanged(['ownerId', 'id', 'createdAt']);
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /invites/{email} {
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.token.email.lower() == email.lower());
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin() || (isAuthenticated() && request.auth.token.email.lower() == email.lower());
+    }
+  }
+}
